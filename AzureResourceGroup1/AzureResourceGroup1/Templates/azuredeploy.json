@@ -1,0 +1,389 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+
+    "user": {
+      "type": "string",
+      "defaultValue": "azureAdmin"
+    },
+    "password": {
+      "type": "securestring",
+      "defaultValue": "!P@ssw0rd"
+    },
+    "pv": { "type": "object" }
+
+  },
+  "variables": {
+    "PrimaryPrefix": "10.100.0.0/16",
+    "PrimarySubnet1Name": "Security",
+    "PrimarySubnet1Prefix": "10.100.1.0/24",
+    //"PrimarySubnet2Name": "Web",
+    //"PrimarySubnet2Prefix": "10.100.2.0/24",
+    //"PrimarySubnet2IP": "10.100.2.",
+    "PrimarySubnet3Name": "APP",
+    "PrimarySubnet3Prefix": "10.100.3.0/24",
+    "PrimarySubnet3IP": "10.100.3.",
+    "ManagementPrefix": "10.200.0.0/16",
+    "ManagementSubnet1Name": "On_Prem",
+    "ManagementSubnet1Prefix": "10.200.1.0/24",
+    "NSModel1NSGName": "[concat('NSModel1NSG', uniqueString(resourceGroup().id))]",
+    "NSModel1Name": "[concat('NSModel1', uniqueString(resourceGroup().id))]",
+    //"NSDisksName": "[concat('NSDisks', uniqueString(resourceGroup().id))]",
+    //"ImagePublisher": "MicrosoftWindowsServer",
+    //"ImageOffer": "WindowsServer",
+    "AppOSDiskName": "AppOSDisk",
+    //"VmSize": "Standard_D1",
+    "AppVnetID": "[resourceId('Microsoft.Network/virtualNetworks', 'Primary')]",
+    "AppSubnetRef": "[concat(variables('AppVnetID'), '/subnets/', variables('PrimarySubnet3Name'))]",
+    "AppStorageAccountContainerName": "vhds",
+    "AppNicName": "[concat(variables('AppName'), 'NetworkInterface')]",
+    "AppName": "App",
+    //"WindowsVersion": "2012-R2-Datacenter",
+    //"webName": "Web",
+
+
+    //"WebOSDiskName": "WebOSDisk",
+
+    //"WebVnetID": "[resourceId('Microsoft.Network/virtualNetworks', 'Primary')]",
+    //"WebSubnetRef": "[concat(variables('WebVnetID'), '/subnets/', variables('PrimarySubnet2Name'))]",
+    //"WebStorageAccountContainerName": "vhds",
+    //"WebNicName": "[concat(variables('webName'), 'NetworkInterface')]",
+    "appCount": 3,
+    //"webCount": 3
+
+
+  },
+  "resources": [
+    {
+      "name": "Primary",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [ ],
+      "tags": {
+        "displayName": "Primary"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('PrimaryPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('PrimarySubnet1Name')]",
+            "properties": {
+              "addressPrefix": "[variables('PrimarySubnet1Prefix')]"
+            }
+          },
+          {
+            "name": "[parameters('pv').PrimarySubnet2Name]",
+            "properties": {
+              "addressPrefix": "[parameters('pv').PrimarySubnet2Prefix]"
+            }
+          },
+          {
+            "name": "[variables('PrimarySubnet3Name')]",
+            "properties": {
+              "addressPrefix": "[variables('PrimarySubnet3Prefix')]"
+            }
+          }
+
+        ]
+      }
+    },
+    {
+      "name": "Management",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [ ],
+      "tags": {
+        "displayName": "Management"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('ManagementPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('ManagementSubnet1Name')]",
+            "properties": {
+              "addressPrefix": "[variables('ManagementSubnet1Prefix')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "[parameters('pv').NSDisksName]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [ ],
+      "tags": {
+        "displayName": "NSDisks"
+      },
+      "properties": {
+        "accountType": "Standard_LRS"
+      }
+    },
+    {
+      "name": "[concat(variables('AppNicName'),copyIndex())]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+        "[concat('Microsoft.Network/virtualNetworks/', 'Primary')]"
+      ],
+      "tags": {
+        "displayName": "AppNic"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[concat(variables('PrimarySubnet3IP'),add(5,copyIndex()))]",
+              "subnet": {
+                "id": "[variables('AppSubnetRef')]"
+              }
+              
+            }
+          }
+        ]
+      },
+      "copy": {
+        "count": "[variables('appCount')]",
+        "name": "AppNicCount"
+      }
+    },
+    {
+      "name": "[concat(variables('AppName'),copyIndex())]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('pv').NSDisksName)]",
+        "[concat('Microsoft.Network/networkInterfaces/', concat(variables('AppNicName'),copyindex()))]"
+      ],
+      "tags": {
+        "displayName": "App"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('pv').VmSize]"
+        },
+        "osProfile": {
+          "computerName": "[variables('AppName')]",
+          "adminUsername": "[parameters('user')]",
+          "adminPassword": "[parameters('password')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[parameters('pv').ImagePublisher]",
+            "offer": "[parameters('pv').ImageOffer]",
+            "sku": "[parameters('pv').WindowsVersion]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "AppOSDisk",
+            "vhd": {
+              "uri": "[concat('http://', parameters('pv').NSDisksName, '.blob.core.windows.net/', variables('AppStorageAccountContainerName'), '/', variables('AppOSDiskName'),copyindex(), '.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('AppNicName'),copyIndex()))]"
+            }
+          ]
+        }
+      },
+      "copy": {
+        "count": "[variables('appCount')]",
+        "name": "AppCount"
+      }
+    },
+    {
+      "name": "NSG",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "HTTP-Web0",
+            "properties": {
+              "description": "Allow HTTP to Web Servers",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "priority": "100",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "10.100.2.5",
+              "destinationPortRange": "80",
+              "access": "Allow"
+            }
+          },
+          {
+            "name": "HTTP-Web2",
+            "properties": {
+              "description": "Allow HTTP to Web Servers",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "priority": "101",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "10.100.2.6",
+              "destinationPortRange": "80",
+              "access": "Allow"
+            }
+          },
+          {
+            "name": "HTTP-Web3",
+            "properties": {
+              "description": "Allow HTTP to Web Servers",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "priority": "102",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "10.100.2.7",
+              "destinationPortRange": "80",
+              "access": "Allow"
+            }
+          },
+          {
+            "name": "Web1toApp1",
+            "properties": {
+              "description": "Allow all ports from Web to App Server 1",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "priority": "110",
+              "sourceAddressPrefix": "10.100.2.5",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "10.100.3.5",
+              "destinationPortRange": "*",
+              "access": "Allow"
+            }
+          },
+          {
+            "name": "Web2toApp1",
+            "properties": {
+              "description": "Allow all ports from Web to App Server 1",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "priority": "111",
+              "sourceAddressPrefix": "10.100.2.6",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "10.100.3.5",
+              "destinationPortRange": "*",
+              "access": "Allow"
+            }
+          },
+          {
+            "name": "Web3toApp1",
+            "properties": {
+              "description": "Allow all ports from Web to App Server 1",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "priority": "112",
+              "sourceAddressPrefix": "10.100.2.7",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "10.100.3.5",
+              "destinationPortRange": "*",
+              "access": "Allow"
+            }
+          },
+          {
+            "name": "BlockWeb",
+            "properties": {
+              "description": "Block Horizontal traffic in Web",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "priority": "120",
+              "sourceAddressPrefix": "10.100.2.0/24",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "10.100.2.0/24",
+              "destinationPortRange": "*",
+              "access": "Deny"
+            }
+          },
+          {
+            "name": "BlockWeb2App",
+            "properties": {
+              "description": "Block all Web traffic to App Subnet",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "priority": "130",
+              "sourceAddressPrefix": "10.100.2.0/24",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "10.100.3.0/24",
+              "destinationPortRange": "*",
+              "access": "Deny"
+            }
+          },
+          {
+            "name": "BlockS2Web",
+            "properties": {
+              "description": "Block Security Subnet to Web",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "priority": "140",
+              "sourceAddressPrefix": "10.100.1.0/24",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "10.100.2.0/24",
+              "destinationPortRange": "*",
+              "access": "Deny"
+            }
+          },
+          {
+            "name": "BlockS2App",
+            "properties": {
+              "description": "Block Security to App",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "priority": "150",
+              "sourceAddressPrefix": "10.100.1.0/24",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "10.100.3.0/24",
+              "destinationPortRange": "*",
+              "access": "Deny"
+            }
+          }
+
+
+
+        ],
+        "subnets": [
+          {
+            "id": "[resourceID('Microsoft.Networks/virtualNetworks/subnets','Primary','Security')]"
+          },
+          {
+            "id": "[resourceID('Microsoft.Networks/virtualNetworks/subnets','Primary','Web')]"
+          },
+          {
+            "id": "[resourceID('Microsoft.Networks/virtualNetworks/subnets','Primary','App')]"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Network/virtualNetworks/', 'Primary')]"
+      ]
+    }
+    
+    
+    
+
+  ],
+  "outputs": {
+  }
+}

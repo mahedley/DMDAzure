@@ -1,0 +1,138 @@
+﻿{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+  "parameters": {
+    "user": {
+      "type": "string",
+      "defaultValue": "azureAdmin"
+    },
+    "password": {
+      "type": "securestring",
+      "defaultValue": "!P@ssw0rd"
+    }
+
+  },
+  "variables": {
+    "webSubnetName": "Web",
+    "pv": {
+      "ImagePublisher": "MicrosoftWindowsServer",
+      "ImageOffer": "WindowsServer",
+      "VmSize": "Standard_D1",
+      "webName": "Web",
+      "PrimarySubnet2Name": "[variables('webSubnetName')]",
+      "PrimarySubnet2Prefix": "10.100.2.0/24",
+      "PrimarySubnet2IP": "10.100.2.",
+      "WebOSDiskName": "WebOSDisk",
+      "WebVnetID": "[resourceId('Microsoft.Network/virtualNetworks', 'Primary')]",
+      "WebSubnetRef": "[concat(resourceId('Microsoft.Network/virtualNetworks', 'Primary'), '/subnets/', variables('webSubnetName'))]",
+      "WebStorageAccountContainerName": "vhds",
+      "WebNicName": "[concat(variables('webSubnetName'), 'NetworkInterface')]",
+      "webCount": 3,
+      "NSDisksName": "[concat('NSDisks', uniqueString(resourceGroup().id))]",
+      "WindowsVersion": "2012-R2-Datacenter"
+    }
+
+  },
+  "resources": [
+    {
+      "name": "[concat(variables('pv').WebNicName,copyIndex())]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+        "Microsoft.Resources/deployments/NSModel1"
+      ],
+      "tags": {
+        "displayName": "WebNic"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[concat(variables('pv').PrimarySubnet2IP,add(5,copyindex()))]",
+              "subnet": {
+                "id": "[variables('pv').WebSubnetRef]"
+              }
+            }
+          }
+        ]
+      },
+      "copy": {
+        "name": "webNicCopy",
+        "count": "[variables('pv').WebCount]"
+      }
+    },
+    {
+      "name": "[concat(variables('pv').webName,copyindex())]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+        "Microsoft.Resources/deployments/NSModel1",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('pv').WebNicName,copyindex())]"
+      ],
+      "tags": {
+        "displayName": "Web"
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('pv').VmSize]"
+        },
+        "osProfile": {
+          "computerName": "[variables('pv').webName]",
+          "adminUsername": "[parameters('user')]",
+          "adminPassword": "[parameters('password')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('pv').ImagePublisher]",
+            "offer": "[variables('pv').ImageOffer]",
+            "sku": "[variables('pv').WindowsVersion]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "WebOSDisk",
+            "vhd": {
+              "uri": "[concat('http://', variables('pv').NSDisksName, '.blob.core.windows.net/', variables('pv').WebStorageAccountContainerName, '/', variables('pv').WebOSDiskName,copyindex(), '.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('pv').WebNicName,copyIndex()))]"
+            }
+          ]
+        }
+      },
+      "copy": {
+        "name": "webCopy",
+        "count": "[variables('pv').webCount]"
+      }
+    },
+      {
+          "name": "NSModel1",
+          "type": "Microsoft.Resources/deployments",
+          "apiVersion": "2015-01-01",
+          "dependsOn": [ ],
+          "properties": {
+              "mode": "Incremental",
+            "templateLink": {
+              "uri": "https://mdhinfrastor.blob.core.windows.net/templates/NSModel1/azuredeploy.json",
+              "contentVersion": "1.0.0.0"
+            },
+            "parameters": {
+              "user": { "value": "[parameters('user')]" },
+              "password": { "value": "[parameters('password')]" },
+              "pv": {"value": "[variables('pv')]"}
+            }
+          }
+      }
+  ],
+    "outputs": {
+    }
+}
