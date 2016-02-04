@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{151D2E53-A2C4-4D7D-83FE-D05416EBD58E}") = "NSBase", "AzureResourceGroup1\NSBase.deployproj", "{054D1B19-FF36-4A6A-B401-E935F2A18628}"
+Project("{151D2E53-A2C4-4D7D-83FE-D05416EBD58E}") = "NSBase", "NSBase\NSBase.deployproj", "{054D1B19-FF36-4A6A-B401-E935F2A18628}"
 EndProject
-Project("{151D2E53-A2C4-4D7D-83FE-D05416EBD58E}") = "NSNSG", "AzureResourceGroup2\NSNSG.deployproj", "{9C1850E9-3FEC-4D69-9C9D-9C1CAE579BE2}"
+Project("{151D2E53-A2C4-4D7D-83FE-D05416EBD58E}") = "NSNSG", "NSNSG\NSNSG.deployproj", "{9C1850E9-3FEC-4D69-9C9D-9C1CAE579BE2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
