@@ -49,7 +49,7 @@
     //"WebSubnetRef": "[concat(variables('WebVnetID'), '/subnets/', variables('PrimarySubnet2Name'))]",
     //"WebStorageAccountContainerName": "vhds",
     //"WebNicName": "[concat(variables('webName'), 'NetworkInterface')]",
-    "appCount": 3,
+    "appCount": 3
     //"webCount": 3
 
 
@@ -137,12 +137,16 @@
       "location": "[resourceGroup().location]",
       "apiVersion": "2015-06-15",
       "dependsOn": [
-        "[concat('Microsoft.Network/virtualNetworks/', 'Primary')]"
+        "[concat('Microsoft.Network/virtualNetworks/', 'Primary')]",
+        "Microsoft.Network/NetworkSecurityGroups/NSG"
       ],
       "tags": {
         "displayName": "AppNic"
       },
       "properties": {
+        "networkSecurityGroup": {
+          "id": "[resourceid('Microsoft.Network/NetworkSecurityGroups','NSG')]"
+        },
         "ipConfigurations": [
           {
             "name": "ipconfig1",
@@ -152,7 +156,7 @@
               "subnet": {
                 "id": "[variables('AppSubnetRef')]"
               }
-              
+
             }
           }
         ]
@@ -362,18 +366,8 @@
 
 
 
-        ],
-        "subnets": [
-          {
-            "id": "[resourceID('Microsoft.Networks/virtualNetworks/subnets','Primary','Security')]"
-          },
-          {
-            "id": "[resourceID('Microsoft.Networks/virtualNetworks/subnets','Primary','Web')]"
-          },
-          {
-            "id": "[resourceID('Microsoft.Networks/virtualNetworks/subnets','Primary','App')]"
-          }
         ]
+       
       },
       "dependsOn": [
         "[concat('Microsoft.Network/virtualNetworks/', 'Primary')]"
